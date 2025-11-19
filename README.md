@@ -13,8 +13,9 @@ Built with the MERN stack (MongoDB, Express.js, React, Node.js) using plain Java
 ### For Students
 - **Event Discovery**: Browse upcoming, ongoing, and past events with filters
 - **Smart Team Formation**: Create teams or join existing ones for specific events
-- **Skill-Based Search**: Find teammates with complementary skills
-- **Profile Management**: Showcase your skills, achievements, and experience
+- **Skill-Based Search**: Find teammates with complementary skills and invite them directly
+- **Invitation System**: View and manage team invitations (accept/decline)
+- **Profile Management**: Showcase your skills, achievements, phone number, and experience
 - **AI Chatbot**: Ask questions about events (stub implementation)
 - **Personalized Dashboard**: See recommended events and potential teammates
 
@@ -218,8 +219,9 @@ For testing, you can create users via the Register page or API.
 
 ### Users
 - `GET /api/users/me` - Get current user profile
-- `PUT /api/users/me` - Update profile
+- `PUT /api/users/me` - Update profile (name, phone, skills, etc.)
 - `GET /api/users/search?skills=react,python` - Search users by skills
+- `GET /api/users/all` - Get all students (for teammate discovery)
 - `GET /api/users/:id` - Get user by ID
 
 ### Events
@@ -234,10 +236,12 @@ For testing, you can create users via the Register page or API.
 ### Teams
 - `POST /api/teams` - Create team
 - `GET /api/teams/my-teams` - Get user's teams
+- `GET /api/teams/my-invites` - Get pending invitations
 - `GET /api/teams/event/:eventId` - Get teams for event
 - `GET /api/teams/:id` - Get team details
 - `POST /api/teams/:id/invite` - Invite user to team
 - `POST /api/teams/:id/join` - Join team (accept invite)
+- `POST /api/teams/:id/decline` - Decline team invitation
 - `POST /api/teams/:id/leave` - Leave team
 - `DELETE /api/teams/:id` - Delete team (Leader only)
 
@@ -280,7 +284,7 @@ For testing, you can create users via the Register page or API.
 
 1. **Register as Student**
    - Go to `/register`
-   - Create student account with skills
+   - Create student account with skills and optional phone number
 
 2. **View Events**
    - Browse dashboard
@@ -302,12 +306,13 @@ For testing, you can create users via the Register page or API.
 
 6. **Search Teammates**
    - Go to `/search`
-   - Search by skills (e.g., "react")
-   - View results
+   - Search by skills (e.g., "react") or view all students
+   - Invite users directly from search results
 
-7. **Invite Team Member**
-   - Open your team
-   - Invite another user by email
+7. **Manage Invitations**
+   - Go to My Teams page
+   - View pending invitations
+   - Accept or decline invites
 
 8. **Test Chatbot**
    - Open any event
