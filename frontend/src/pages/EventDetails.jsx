@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import geminiService from '../utils/geminiService';
 
 const EventDetails = () => {
   const { id } = useParams();
@@ -21,8 +22,10 @@ const EventDetails = () => {
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [chatbotQuestion, setChatbotQuestion] = useState('');
-  const [chatbotAnswer, setChatbotAnswer] = useState('');
+  const [chatHistory, setChatHistory] = useState([]); // Changed to chat history array
   const [chatbotLoading, setChatbotLoading] = useState(false);
+  const [brochureSummary, setBrochureSummary] = useState('');
+  const [summarizing, setSummarizing] = useState(false);
 
   useEffect(() => {
     fetchEvent();
@@ -75,16 +78,62 @@ const EventDetails = () => {
     e.preventDefault();
     if (!chatbotQuestion.trim()) return;
 
+    const currentQuestion = chatbotQuestion;
+    
+    // Add user message to chat history immediately
+    setChatHistory(prev => [...prev, { type: 'user', message: currentQuestion, timestamp: Date.now() }]);
+    setChatbotQuestion(''); // Clear question field
     setChatbotLoading(true);
+
     try {
-      const response = await api.post(`/events/${id}/ask`, {
-        question: chatbotQuestion
-      });
-      setChatbotAnswer(response.data.answer);
+      console.log('Asking chatbot:', currentQuestion);
+      console.log('Event data:', event);
+      
+      // Use Gemini AI for better responses
+      const answer = await geminiService.answerEventQuestion(currentQuestion, event);
+      
+      // Add bot response to chat history
+      setChatHistory(prev => [...prev, { type: 'bot', message: answer, timestamp: Date.now() }]);
     } catch (error) {
-      setChatbotAnswer('Sorry, I could not process your question. Please try again.');
+      console.error('Chatbot error:', error);
+      
+      // Add error message to chat history
+      setChatHistory(prev => [...prev, { 
+        type: 'bot', 
+        message: `Sorry, I could not process your question: ${error.message}`,
+        timestamp: Date.now()
+      }]);
     } finally {
       setChatbotLoading(false);
+    }
+  };
+
+  const handleSummarizeBrochure = async () => {
+    if (!event.brochureUrl) return;
+
+    setSummarizing(true);
+    try {
+      console.log('Starting brochure summarization...');
+      
+      // Use the new API-based method with caching
+      const summary = await geminiService.analyzeBrochureViaAPI(id);
+      setBrochureSummary(summary);
+      
+      // Switch to chatbot tab and scroll to it
+      setActiveTab('chatbot');
+      
+      // Add brochure summary to chat history
+      setChatHistory(prev => [...prev, { 
+        type: 'bot', 
+        message: `📄 **Brochure Summary:**\n\n${summary}\n\n---\n\nFeel free to ask me any specific questions about this event!`,
+        timestamp: Date.now()
+      }]);
+      
+    } catch (error) {
+      console.error('Error summarizing brochure:', error);
+      alert(error.message);
+    } finally {
+      setSummarizing(false);
     }
   };
 
@@ -198,15 +247,32 @@ const EventDetails = () => {
             <p className="text-gray-700 whitespace-pre-wrap">{event.description}</p>
 
             {event.brochureUrl && (
-              <div className="mt-6">
+              <div className="mt-6 flex flex-wrap gap-4 items-center">
                 <a
-                  href={event.brochureUrl}
+                  href={event.brochureUrl.startsWith('/media/') ? `http://localhost:5000${event.brochureUrl}` : event.brochureUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary-600 hover:text-primary-700 font-medium"
                 >
-                  📄 View Event Brochure
+                  📄 {event.brochureUrl.startsWith('/media/') ? 
+                    `View Event Brochure (${event.brochureUrl.split('/').pop()})` : 
+                    'View Event Brochure'
+                  }
                 </a>
+                <button
+                  onClick={handleSummarizeBrochure}
+                  disabled={summarizing}
+                  className="btn-secondary text-sm disabled:opacity-50"
+                >
+                  {summarizing ? (
+                    <>
+                      <span className="animate-spin mr-2">⚡</span>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>🤖 Summarise Brochure</>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -320,7 +386,12 @@ const EventDetails = () => {
           <div>
             <h2 className="text-2xl font-bold mb-4">Ask About This Event</h2>
             <p className="text-gray-600 mb-6">
-              Ask me anything about the event - deadlines, team size, rules, and more!
+              Ask me anything about the event - deadlines, team size, rules, and more! 
+              {event.brochureUrl && (
+                <span className="block mt-2 text-sm">
+                  💡 <strong>Tip:</strong> Use the "Summarise Brochure" button above to get AI-powered insights from the event brochure.
+                </span>
+              )}
             </p>
 
             <form onSubmit={handleAskChatbot} className="mb-6">
@@ -340,17 +411,53 @@ const EventDetails = () => {
                   disabled={chatbotLoading}
                   className="btn-primary disabled:opacity-50"
                 >
-                  {chatbotLoading ? 'Thinking...' : 'Ask'}
+                  {chatbotLoading ? '🤔 Thinking...' : '🚀 Ask'}
                 </button>
               </div>
             </form>
 
-            {chatbotAnswer && (
-              <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
-                <h3 className="font-bold mb-2">Answer:</h3>
-                <p className="text-gray-700 whitespace-pre-wrap">{chatbotAnswer}</p>
-              </div>
-            )}
+            {/* Chat History */}
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {chatHistory.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  No messages yet. Ask a question to get started!
+                </div>
+              ) : (
+                chatHistory.map((message, index) => (
+                  <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-3xl p-3 rounded-lg ${
+                      message.type === 'user' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {message.type === 'user' ? (
+                        <div className="text-right">
+                          <span className="text-sm font-medium">You:</span>
+                          <div className="mt-1">{message.message}</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">🤖 AI Assistant:</span>
+                          <div className="mt-1 whitespace-pre-wrap prose prose-sm max-w-none">
+                            {message.message}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              
+              {/* Loading indicator */}
+              {chatbotLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-600">🤖 AI Assistant:</span>
+                    <div className="mt-1">🤔 Thinking...</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

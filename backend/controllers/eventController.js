@@ -6,6 +6,8 @@
 const Event = require('../models/Event');
 const { parseEventBrochure } = require('../services/aiParserService');
 const { answerEventQuestion } = require('../services/chatbotService');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Create a new event (Admin only)
@@ -18,29 +20,51 @@ const createEvent = async (req, res, next) => {
       description,
       categories,
       rules,
-      deadlines,
-      teamSize,
-      brochureUrl
+      teamSizeMin,
+      teamSizeMax,
+      registrationClose,
+      eventStart,
+      eventEnd
     } = req.body;
 
     // Validate required fields
-    if (!title || !description || !categories || !teamSize) {
+    if (!title || !description || !categories) {
       return res.status(400).json({
         error: {
           code: 400,
-          message: 'Title, description, categories, and teamSize are required'
+          message: 'Title, description, and categories are required'
         }
       });
+    }
+
+    // Process categories and rules
+    const categoriesArray = categories.split(',').map(c => c.trim()).filter(c => c);
+    const rulesArray = rules ? rules.split('\n').map(r => r.trim()).filter(r => r) : [];
+
+    // Build deadlines object
+    const deadlines = {};
+    if (registrationClose) deadlines.registrationClose = new Date(registrationClose);
+    if (eventStart) deadlines.eventStart = new Date(eventStart);
+    if (eventEnd) deadlines.eventEnd = new Date(eventEnd);
+
+    // Handle brochure file upload
+    let brochureUrl = null;
+    if (req.file) {
+      // Create URL path for the uploaded file
+      brochureUrl = `/media/${req.file.filename}`;
     }
 
     // Create new event
     const event = new Event({
       title,
       description,
-      categories,
-      rules: rules || [],
-      deadlines: deadlines || {},
-      teamSize,
+      categories: categoriesArray,
+      rules: rulesArray,
+      deadlines,
+      teamSize: {
+        min: parseInt(teamSizeMin) || 1,
+        max: parseInt(teamSizeMax) || 6
+      },
       brochureUrl,
       createdBy: req.user._id
     });
@@ -298,6 +322,99 @@ const askChatbot = async (req, res, next) => {
   }
 };
 
+/**
+ * Summarize event brochure using AI
+ * POST /api/events/:id/summarize-brochure
+ */
+const summarizeBrochure = async (req, res, next) => {
+  try {
+    // Get event details
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return res.status(404).json({
+        error: {
+          code: 404,
+          message: 'Event not found'
+        }
+      });
+    }
+
+    if (!event.brochureUrl) {
+      return res.status(400).json({
+        error: {
+          code: 400,
+          message: 'No brochure available for this event'
+        }
+      });
+    }
+
+    // Check if brochure file exists for local files
+    if (event.brochureUrl.startsWith('/media/')) {
+      const filePath = path.join(__dirname, '..', event.brochureUrl.substring(1)); // Remove leading slash
+      
+      console.log('Brochure URL:', event.brochureUrl);
+      console.log('Constructed file path:', filePath);
+      console.log('__dirname:', __dirname);
+      console.log('File exists:', fs.existsSync(filePath));
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          error: {
+            code: 404,
+            message: `Brochure file not found on server. Path: ${filePath}`
+          }
+        });
+      }
+
+      // Read the file and convert to base64
+      const fileBuffer = fs.readFileSync(filePath);
+      const base64Data = fileBuffer.toString('base64');
+      
+      // Determine file type from extension
+      const ext = path.extname(filePath).toLowerCase();
+      let mimeType = 'application/octet-stream';
+      
+      switch(ext) {
+        case '.jpg':
+        case '.jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case '.png':
+          mimeType = 'image/png';
+          break;
+        case '.pdf':
+          mimeType = 'application/pdf';
+          break;
+        case '.gif':
+          mimeType = 'image/gif';
+          break;
+      }
+
+      // Return the file data for the frontend to process
+      res.json({
+        message: 'Brochure data retrieved successfully',
+        data: {
+          base64: base64Data,
+          mimeType: mimeType,
+          filename: path.basename(filePath)
+        }
+      });
+    } else {
+      // For external URLs (like Google Drive), return the URL for frontend processing
+      res.json({
+        message: 'External brochure URL retrieved',
+        data: {
+          url: event.brochureUrl
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error retrieving brochure:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   createEvent,
   getEvents,
@@ -305,5 +422,6 @@ module.exports = {
   updateEvent,
   deleteEvent,
   parseBrochure,
-  askChatbot
+  askChatbot,
+  summarizeBrochure
 };

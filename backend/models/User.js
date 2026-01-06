@@ -112,9 +112,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster email lookups
-userSchema.index({ email: 1 });
-
 // Index for skill-based searching
 userSchema.index({ skills: 1 });
 

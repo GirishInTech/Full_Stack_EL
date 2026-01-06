@@ -52,6 +52,13 @@ const authLimiter = rateLimit({
 });
 
 // ============================================
+// STATIC FILE SERVING  
+// ============================================
+
+// Serve uploaded media files
+app.use('/media', express.static('media'));
+
+// ============================================
 // ROUTES
 // ============================================
 

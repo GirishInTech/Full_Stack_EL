@@ -112,7 +112,7 @@ const Register = () => {
                 value={formData.name}
                 onChange={handleChange}
                 className="input-field mt-1"
-                placeholder="John Doe"
+                placeholder="abc def"
               />
             </div>
 
@@ -129,7 +129,7 @@ const Register = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className="input-field mt-1"
-                placeholder="you@example.com"
+                placeholder="you@gmail.com"
               />
             </div>
 
@@ -145,7 +145,7 @@ const Register = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 className="input-field mt-1"
-                placeholder="e.g., +1 555-123-4567"
+                placeholder="e.g.,9876543210"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Optional. Digits, spaces, +, -, and () allowed.
@@ -165,7 +165,7 @@ const Register = () => {
                 className="input-field mt-1"
               >
                 <option value="student">Student</option>
-                <option value="admin">Admin</option>
+                {/* <option value="admin">Admin</option> */}
               </select>
             </div>
 

@@ -18,9 +18,9 @@ const CreateEvent = () => {
     teamSizeMax: 6,
     registrationClose: '',
     eventStart: '',
-    eventEnd: '',
-    brochureUrl: ''
+    eventEnd: ''
   });
+  const [brochureFile, setBrochureFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,37 +31,66 @@ const CreateEvent = () => {
     });
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Please upload only PDF, JPEG, or PNG files');
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size must be less than 5MB');
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      setBrochureFile(file);
+      setError(''); // Clear any previous error
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      // Prepare data
-      const eventData = {
-        title: formData.title,
-        description: formData.description,
-        categories: formData.categories.split(',').map(c => c.trim()).filter(c => c),
-        rules: formData.rules.split('\n').map(r => r.trim()).filter(r => r),
-        teamSize: {
-          min: parseInt(formData.teamSizeMin),
-          max: parseInt(formData.teamSizeMax)
-        },
-        deadlines: {},
-        brochureUrl: formData.brochureUrl
-      };
-
+      // Create FormData for file upload
+      const submitData = new FormData();
+      
+      // Add basic event data
+      submitData.append('title', formData.title);
+      submitData.append('description', formData.description);
+      submitData.append('categories', formData.categories);
+      submitData.append('rules', formData.rules);
+      submitData.append('teamSizeMin', formData.teamSizeMin);
+      submitData.append('teamSizeMax', formData.teamSizeMax);
+      
+      // Add deadlines if provided
       if (formData.registrationClose) {
-        eventData.deadlines.registrationClose = new Date(formData.registrationClose);
+        submitData.append('registrationClose', formData.registrationClose);
       }
       if (formData.eventStart) {
-        eventData.deadlines.eventStart = new Date(formData.eventStart);
+        submitData.append('eventStart', formData.eventStart);
       }
       if (formData.eventEnd) {
-        eventData.deadlines.eventEnd = new Date(formData.eventEnd);
+        submitData.append('eventEnd', formData.eventEnd);
+      }
+      
+      // Add brochure file if selected
+      if (brochureFile) {
+        submitData.append('brochure', brochureFile);
       }
 
-      const response = await api.post('/events', eventData);
+      const response = await api.post('/events', submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       alert('Event created successfully!');
       navigate(`/events/${response.data.event._id}`);
     } catch (error) {
@@ -218,19 +247,33 @@ const CreateEvent = () => {
             </div>
           </div>
 
-          {/* Brochure URL */}
+          {/* Brochure Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Brochure URL (optional)
+              Event Brochure (optional)
             </label>
-            <input
-              type="url"
-              name="brochureUrl"
-              value={formData.brochureUrl}
-              onChange={handleChange}
-              className="input-field"
-              placeholder="https://example.com/brochure.pdf"
-            />
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              <input
+                type="file"
+                onChange={handleFileChange}
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-lg file:border-0
+                          file:text-sm file:font-medium
+                          file:bg-primary-50 file:text-primary-700
+                          hover:file:bg-primary-100
+                          cursor-pointer"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Upload PDF, JPEG, or PNG files (max 5MB)
+              </p>
+              {brochureFile && (
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ Selected: {brochureFile.name}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Submit buttons */}

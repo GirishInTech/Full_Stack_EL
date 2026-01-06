@@ -13,7 +13,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, process.env.UPLOAD_DIR || 'uploads/');
+    cb(null, 'media/'); // Save to media folder
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -42,10 +42,10 @@ const upload = multer({
 
 /**
  * @route   POST /api/events
- * @desc    Create a new event
+ * @desc    Create a new event with optional brochure upload
  * @access  Private (Admin only)
  */
-router.post('/', authenticate, requireAdmin, eventController.createEvent);
+router.post('/', authenticate, requireAdmin, upload.single('brochure'), eventController.createEvent);
 
 /**
  * @route   GET /api/events
@@ -94,5 +94,12 @@ router.post(
  * @access  Private
  */
 router.post('/:id/ask', authenticate, eventController.askChatbot);
+
+/**
+ * @route   POST /api/events/:id/summarize-brochure
+ * @desc    Get brochure data for AI summarization
+ * @access  Private
+ */
+router.post('/:id/summarize-brochure', authenticate, eventController.summarizeBrochure);
 
 module.exports = router;
